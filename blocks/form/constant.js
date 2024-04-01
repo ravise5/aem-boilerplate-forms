@@ -1,6 +1,8 @@
 export const fileAttachmentText = 'Attach';
 export const dragDropText = 'Drag and Drop To Upload';
 
+export const DEFAULT_THANK_YOU_MESSAGE = 'Thank you for your submission.';
+
 export const defaultErrorMessages = {
   accept: 'The specified file type not supported.',
   maxFileSize: 'File too large. Reduce size and try again.',
