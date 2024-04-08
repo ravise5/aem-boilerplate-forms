@@ -1,3 +1,4 @@
+import { toCamelCase } from '../../scripts/aem.js';
 // create a string containing head tags from h1 to h5
 const headings = Array.from({ length: 5 }, (_, i) => `<h${i + 1}>`).join('');
 const allowedTags = `${headings}<a><b><p><i><em><strong><ul><li>`;
@@ -11,6 +12,13 @@ export function stripTags(input, allowd = allowedTags) {
   const comments = /<!--[\s\S]*?-->/gi;
   return input.replace(comments, '')
     .replace(tags, ($0, $1) => (allowed.indexOf(`<${$1.toLowerCase()}>`) > -1 ? $0 : ''));
+}
+
+export function translate(text, placeholders) {
+  const key = toCamelCase(text);
+  const placeholderExists = placeholders && placeholders[key];
+  // fallback to default if placeholder not found
+  return placeholderExists ? placeholders[key] : text;
 }
 
 /**
@@ -53,15 +61,15 @@ export function resetIds() {
   getId(clear);
 }
 
-export function createLabel(fd, tagName = 'label') {
+export function createLabel(fd, placeholders, tagName = 'label') {
   if (fd.label && fd.label.value) {
     const label = document.createElement(tagName);
     label.setAttribute('for', fd.id);
     label.className = 'field-label';
     if (fd.label.richText === true) {
-      label.innerHTML = stripTags(fd.label.value);
+      label.innerHTML = translate(stripTags(fd.label.value), placeholders);
     } else {
-      label.textContent = fd.label.value;
+      label.textContent = translate(fd.label.value, placeholders);
     }
     if (fd.label.visible === false) {
       label.dataset.visible = 'false';
@@ -78,7 +86,7 @@ export function getHTMLRenderType(fd) {
   return fd?.fieldType?.replace('-input', '') ?? 'text';
 }
 
-export function createFieldWrapper(fd, tagName = 'div', labelFn = createLabel) {
+export function createFieldWrapper(fd, placeholders, tagName = 'div', labelFn = createLabel) {
   const fieldWrapper = document.createElement(tagName);
   const nameStyle = fd.name ? ` field-${toClassName(fd.name)}` : '';
   const renderType = getHTMLRenderType(fd);
@@ -90,19 +98,21 @@ export function createFieldWrapper(fd, tagName = 'div', labelFn = createLabel) {
   }
   fieldWrapper.classList.add('field-wrapper');
   if (fd.label && fd.label.value && typeof labelFn === 'function') {
-    const label = labelFn(fd);
-    if (label) { fieldWrapper.append(label); }
+    const label = labelFn(fd, placeholders);
+    if (label) {
+      fieldWrapper.append(label);
+    }
   }
   return fieldWrapper;
 }
 
-export function createButton(fd) {
-  const wrapper = createFieldWrapper(fd);
+export function createButton(fd, placeholders) {
+  const wrapper = createFieldWrapper(fd, placeholders);
   if (fd.buttonType) {
     wrapper.classList.add(`${fd?.buttonType}-wrapper`);
   }
   const button = document.createElement('button');
-  button.textContent = fd?.label?.visible === false ? '' : fd?.label?.value;
+  button.textContent = translate(fd?.label?.visible === false ? '' : fd?.label?.value, placeholders);
   button.type = fd.buttonType || 'button';
   button.classList.add('button');
   button.id = fd.id;
@@ -139,11 +149,11 @@ function getFieldContainer(fieldElement) {
   return container;
 }
 
-export function createHelpText(fd) {
+export function createHelpText(fd, placeholders) {
   const div = document.createElement('div');
   div.className = 'field-description';
   div.setAttribute('aria-live', 'polite');
-  div.innerHTML = fd.description;
+  div.innerHTML = translate(fd.description, placeholders);
   div.id = `${fd.id}-description`;
   return div;
 }
@@ -202,7 +212,7 @@ function updateRequiredCheckboxGroup(name, htmlForm) {
   });
 }
 
-export function checkValidation(fieldElement) {
+export function checkValidation(fieldElement, placeholders) {
   const wrapper = fieldElement.closest('.field-wrapper');
   const isCheckboxGroup = fieldElement.dataset.fieldType === 'checkbox-group';
   const required = wrapper?.dataset?.required;
@@ -218,6 +228,10 @@ export function checkValidation(fieldElement) {
     .filter((state) => fieldElement.validity[state]);
 
   const message = wrapper.dataset[validityKeyMsgMap[invalidProperty]]
-  || fieldElement.validationMessage;
-  updateOrCreateInvalidMsg(fieldElement, message);
+    || fieldElement.validationMessage;
+  updateOrCreateInvalidMsg(fieldElement, translate(message, placeholders));
+}
+
+export function getPlaceHolderPath() {
+  return window.location.pathname?.split('/')?.slice(0, -1)?.join('/');
 }

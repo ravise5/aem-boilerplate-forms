@@ -1,8 +1,11 @@
-import { updateOrCreateInvalidMsg, stripTags } from '../util.js';
+import {
+  updateOrCreateInvalidMsg, stripTags, getPlaceHolderPath, translate,
+} from '../util.js';
 import { fileAttachmentText, dragDropText, defaultErrorMessages } from '../constant.js';
+import { fetchPlaceholders } from '../../../scripts/aem.js';
 
 const fileSizeRegex = /^(\d*\.?\d+)(\\?(?=[KMGT])([KMGT])(?:i?B)?|B?)$/i;
-
+let placeholders = {};
 /**
  * converts a string of the form "10MB" to bytes. If the string is malformed 0 is returned
  * @param {*} str
@@ -86,15 +89,15 @@ function fileValidation(input, files) {
     constraint = 'maxFileSize';
   } else if (multiple && maxItems !== -1 && files.length > maxItems) {
     constraint = 'maxItems';
-    errorMessage = defaultErrorMessages.maxItems.replace(/\$0/, maxItems);
+    errorMessage = translate(defaultErrorMessages.maxItems, placeholders).replace(/\$0/, maxItems);
   } else if (multiple && minItems !== 1 && files.length < minItems) {
     constraint = 'minItems';
-    errorMessage = defaultErrorMessages.minItems.replace(/\$0/, minItems);
+    errorMessage = translate(defaultErrorMessages.minItems, placeholders).replace(/\$0/, minItems);
   }
   if (constraint.length) {
     const finalMessage = wrapper.dataset[constraint]
-    || errorMessage
-    || defaultErrorMessages[constraint];
+      || errorMessage
+      || translate(defaultErrorMessages[constraint], placeholders);
     input.setCustomValidity(finalMessage);
     updateOrCreateInvalidMsg(
       input,
@@ -152,8 +155,8 @@ function createDragAndDropArea(wrapper) {
   const input = wrapper.querySelector('input');
   const dragArea = `
     <div class="file-dragIcon"></div>
-    <div class="file-dragText">${dragDropText}</div>
-    <button class="file-attachButton" type="button">${fileAttachmentText}</button>
+    <div class="file-dragText">${translate(dragDropText, placeholders)}</div>
+    <button class="file-attachButton" type="button">${translate(fileAttachmentText, placeholders)}</button>
   `;
   const dragContainer = document.createElement('div');
   if (input.title) {
@@ -219,6 +222,7 @@ function createFileHandler(allFiles, input) {
 // eslint-disable-next-line no-unused-vars
 export default async function decorate(fieldDiv, field, htmlForm) {
   const allFiles = [];
+  placeholders = await fetchPlaceholders(getPlaceHolderPath());
   const dragArea = createDragAndDropArea(fieldDiv);
   const input = fieldDiv.querySelector('input');
   fieldDiv.classList.add('decorated');
