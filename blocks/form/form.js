@@ -243,13 +243,6 @@ const fieldRenderers = {
   heading: createHeading,
 };
 
-async function fetchForm(pathname) {
-  // get the main form
-  const resp = await fetch(pathname);
-  const json = await resp.json();
-  return json;
-}
-
 function colSpanDecorator(field, element) {
   const colSpan = field['Column Span'] || field.properties?.colspan;
   if (colSpan && element) {
@@ -433,20 +426,52 @@ function cleanUp(content) {
   return formDef?.replace(/\x83\n|\n|\s\s+/g, '');
 }
 
+function extractFormDefinition(block) {
+  let formDef;
+  const container = block.querySelector('pre');
+  const codeEl = container?.querySelector('code');
+  const content = codeEl?.textContent;
+  if (content) {
+    formDef = JSON.parse(cleanUp(content));
+  }
+  return { container, formDef };
+}
+
+export async function fetchForm(pathname) {
+  // get the main form
+  let data;
+  let resp = await fetch(pathname);
+
+  if (resp?.headers?.get('Content-Type')?.includes('application/json')) {
+    data = await resp.json();
+  } else if (resp?.headers?.get('Content-Type')?.includes('text/html')) {
+    const path = pathname.replace('.html', '.md.html');
+    resp = await fetch(path);
+    data = await resp.text().then((html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        if (doc) {
+          return extractFormDefinition(doc.body).formDef;
+        }
+        return doc;
+      } catch (e) {
+        console.error('Unable to fetch form definition for path', pathname);
+        return null;
+      }
+    });
+  }
+  return data;
+}
+
 export default async function decorate(block) {
-  let container = block.querySelector('a[href$=".json"]');
+  let container = block.querySelector('a[href]');
   let formDef;
   let pathname;
   if (container) {
     ({ pathname } = new URL(container.href));
     formDef = await fetchForm(container.href);
   } else {
-    container = block.querySelector('pre');
-    const codeEl = container?.querySelector('code');
-    const content = codeEl?.textContent;
-    if (content) {
-      formDef = JSON.parse(cleanUp(content));
-    }
+    ({ container, formDef } = extractFormDefinition(block));
   }
   let source = 'aem';
   let rules = true;
